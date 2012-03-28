@@ -1,0 +1,21 @@
+Name:                config-th
+Version:             0.0.0.1
+Synopsis:            Automatic config file parser derived from data declaration
+Homepage:            https://github.com/shangaslammi/config-th
+License:             MIT
+License-file:        LICENSE
+Author:              Sami Hangaslammi
+Maintainer:          shang@iki.fi
+Category:            Data
+Build-type:          Simple
+
+Extra-source-files: test/*
+
+Cabal-version:       >=1.2
+
+Library
+  Hs-Source-Dirs:      src
+  Exposed-modules:     Data.Config.TH
+
+  -- Packages needed in order to build this package.
+  Build-depends: base, template-haskell

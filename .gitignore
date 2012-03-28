@@ -1,0 +1,4 @@
+Setup.hs
+dist
+*.hi
+*.o
