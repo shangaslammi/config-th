@@ -25,7 +25,7 @@ data ConfigError
 mkConfig :: Name -> Q [Dec]
 mkConfig name = [d|
     instance Config $(conT name) where
-        parseConf = $(impl)
+        parseConfig = $(impl)
     |] where
         impl = [|\s -> case parseFields s of
             Just fields -> $constrCfg fields
@@ -63,8 +63,8 @@ mkConfig name = [d|
                 Nothing -> $resolveMissing|]
 
 class Config c where
-    parseConf :: String -> Either ConfigError c
-    parseConf = undefined
+    parseConfig :: String -> Either ConfigError c
+    parseConfig = undefined
 
 (@@) :: (Config c, ConfigValue v) => c -> (c -> v) -> v
 (@@) = flip ($)
