@@ -20,6 +20,7 @@ data ConfigError
     = MissingField String
     | InvalidValue String
     | SyntaxError
+    deriving (Eq, Show)
 
 mkConfig :: Name -> Q [Dec]
 mkConfig name = [d|
