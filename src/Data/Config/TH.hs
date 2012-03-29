@@ -1,6 +1,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE TypeSynonymInstances #-}
 
 module Data.Config.TH
     ( mkConfig
@@ -47,7 +48,7 @@ mkConfig name = [d|
                     step (e,op) bldr = (infixApp e op (appE bldr fldParam), star)
                     (expr, _) = foldl' step (conE cname, [|(<$>)|]) builders
 
-                [|\fields -> $expr|]
+                lam1E (varP (mkName "fields"))  expr
             _ -> error "mkConfig can only be called for data types with one record constructor"
 
         buildField :: VarStrictType -> ExpQ
