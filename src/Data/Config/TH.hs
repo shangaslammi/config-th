@@ -37,13 +37,13 @@ mkConfig name = [d|
         constrCfg = do
             info <- reify name
             case info of
-                TyConI (DataD _ _ _ cons _) -> processCons cons
+                TyConI (DataD _ _ _ cons _) -> processCons "" cons
                 _ -> error "mkConfig can only be called for data types"
 
-        processCons :: [Con] -> ExpQ
-        processCons cons = case cons of
+        processCons :: String -> [Con] -> ExpQ
+        processCons prefix cons = case cons of
             [RecC cname vars] -> do
-                let builders = map buildField vars
+                let builders = map (buildField prefix) vars
                     star     = [|(<*>)|]
                     fldParam = varE (mkName "fields")
                     step (e,op) bldr = (infixApp e op (appE bldr fldParam), star)
@@ -58,14 +58,18 @@ mkConfig name = [d|
                 nameStr = map toLower . nameBase $ name
         consItem _ = error "Constructors for algebraic datatypes cannot take arguments"
 
-        buildField :: VarStrictType -> ExpQ
-        buildField (name, _, typ) = do
-            let nameStr = nameBase name
+        buildField :: String -> VarStrictType -> ExpQ
+        buildField prefix (name, _, typ) = do
+            let nameStr = prefix ++ nameBase name
                 defaultResolver = [|parseValue|]
+                defaultMissing  = [|\_ -> Left $ MissingField nameStr|]
+                nestedResolver cons = processCons (nameStr ++ ".") cons
+
                 resolveValue = case typ of
                     ConT tnam -> do
                         info <- reify tnam
                         case info of
+                            TyConI (DataD _ _ _ c@[RecC _ _] _) -> [|\sv -> Left $ InvalidValue sv|]
                             TyConI (DataD _ _ _ [_] _) -> defaultResolver
                             TyConI (DataD _ _ _ cons _) -> do
                                 let lst = listE . map consItem $ cons
@@ -78,12 +82,17 @@ mkConfig name = [d|
 
                 resolveMissing = case typ of
                     AppT a b
-                        | a == (ConT ''Maybe) -> [|Right Nothing|]
-                    _ -> [|Left $ MissingField nameStr|]
+                        | a == (ConT ''Maybe) -> [|\_ -> Right Nothing|]
+                    ConT tnam -> do
+                        info <- reify tnam
+                        case info of
+                            TyConI (DataD _ _ _ c@[RecC _ _] _) -> nestedResolver c
+                            _ -> defaultMissing
+                    _ -> defaultMissing
 
             [|\fields -> case lookup nameStr fields of
                 Just sv -> $resolveValue sv
-                Nothing -> $resolveMissing|]
+                Nothing -> $resolveMissing fields|]
 
 class Config c where
     parseConfig :: String -> Either ConfigError c
