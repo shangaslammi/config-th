@@ -16,6 +16,7 @@ import Language.Haskell.TH.Syntax
 import Control.Applicative
 import Control.Monad
 import Data.List
+import Data.Char (toLower)
 
 data ConfigError
     = MissingField String
@@ -51,23 +52,44 @@ mkConfig name = [d|
                 lam1E (varP (mkName "fields"))  expr
             _ -> error "mkConfig can only be called for data types with one record constructor"
 
+        consItem :: Con -> ExpQ
+        consItem (NormalC name []) = [|(nameStr, $(conE name))|]
+            where
+                nameStr = map toLower . nameBase $ name
+        consItem _ = error "Constructors for algebraic datatypes cannot take arguments"
+
         buildField :: VarStrictType -> ExpQ
         buildField (name, _, typ) = do
             let nameStr = nameBase name
+                defaultResolver = [|parseValue|]
+                resolveValue = case typ of
+                    ConT tnam -> do
+                        info <- reify tnam
+                        case info of
+                            TyConI (DataD _ _ _ [_] _) -> defaultResolver
+                            TyConI (DataD _ _ _ cons _) -> do
+                                let lst = listE . map consItem $ cons
+                                [|\sv -> case lookup sv $lst of
+                                    Nothing -> Left $ InvalidValue sv
+                                    Just c  -> Right c |]
+                            _ -> defaultResolver
+
+                    _ -> defaultResolver
+
                 resolveMissing = case typ of
                     AppT a b
                         | a == (ConT ''Maybe) -> [|Right Nothing|]
                     _ -> [|Left $ MissingField nameStr|]
 
             [|\fields -> case lookup nameStr fields of
-                Just sv -> parseValue sv
+                Just sv -> $resolveValue sv
                 Nothing -> $resolveMissing|]
 
 class Config c where
     parseConfig :: String -> Either ConfigError c
     parseConfig = undefined
 
-(@@) :: (Config c, ConfigValue v) => c -> (c -> v) -> v
+(@@) :: (Config c) => c -> (c -> v) -> v
 (@@) = flip ($)
 
 infixl 5 @@
