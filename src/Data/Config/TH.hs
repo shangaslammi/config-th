@@ -46,7 +46,7 @@ mkConfig name = configInstance where
     handleRecord prefix [RecC cname vars] = lam1E (varP parName) expr where
         parName   = mkName "fields"
         (expr, _) = foldl' step (conE cname, [|(<$>)|]) builders
-        builders  = map (buildField prefix) vars
+        builders  = map (buildRecField prefix) vars
         fldParam  = varE parName
         step (e,op) bldr = (infixApp e op (appE bldr fldParam), [|(<*>)|])
 
@@ -54,13 +54,12 @@ mkConfig name = configInstance where
         "mkConfig can only be called for data types with one record constructor"
 
     consItem :: Con -> ExpQ
-    consItem (NormalC name []) = [|(nameStr, $(conE name))|]
-        where
-            nameStr = map toLower . nameBase $ name
+    consItem (NormalC name []) = [|(nameStr, $(conE name))|] where
+        nameStr = map toLower . nameBase $ name
     consItem _ = error "Constructors for algebraic datatypes cannot take arguments"
 
-    buildField :: String -> VarStrictType -> ExpQ
-    buildField prefix (name, _, typ) = do
+    buildRecField :: String -> VarStrictType -> ExpQ
+    buildRecField prefix (name, _, typ) = do
         let nameStr = prefix ++ nameBase name
             defaultResolver = [|parseValue|]
             defaultMissing  = [|\_ -> Left $ MissingField nameStr|]
