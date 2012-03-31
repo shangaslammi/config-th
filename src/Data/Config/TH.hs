@@ -59,40 +59,43 @@ mkConfig name = configInstance where
     consItem _ = error "Constructors for algebraic datatypes cannot take arguments"
 
     buildRecField :: String -> VarStrictType -> ExpQ
-    buildRecField prefix (name, _, typ) = do
-        let nameStr = prefix ++ nameBase name
-            defaultResolver = [|parseValue|]
-            defaultMissing  = [|\_ -> Left $ MissingField nameStr|]
-            nestedResolver cons = handleRecord (nameStr ++ ".") cons
+    buildRecField prefix (name, _, typ) = impl where
 
-            resolveValue = case typ of
-                ConT tnam -> do
-                    info <- reify tnam
-                    case info of
-                        TyConI (DataD _ _ _ c@[RecC _ _] _) -> [|\sv -> Left $ InvalidValue sv|]
-                        TyConI (DataD _ _ _ [_] _) -> defaultResolver
-                        TyConI (DataD _ _ _ cons _) -> do
-                            let lst = listE . map consItem $ cons
-                            [|\sv -> case lookup sv $lst of
-                                Nothing -> Left $ InvalidValue sv
-                                Just c  -> Right c |]
-                        _ -> defaultResolver
-
-                _ -> defaultResolver
-
-            resolveMissing = case typ of
-                AppT a b
-                    | a == (ConT ''Maybe) -> [|\_ -> Right Nothing|]
-                ConT tnam -> do
-                    info <- reify tnam
-                    case info of
-                        TyConI (DataD _ _ _ c@[RecC _ _] _) -> nestedResolver c
-                        _ -> defaultMissing
-                _ -> defaultMissing
-
-        [|\fields -> case lookup nameStr fields of
+        impl = [|\fields -> case lookup nameStr fields of
             Just sv -> $resolveValue sv
             Nothing -> $resolveMissing fields|]
+
+        nameStr = prefix ++ nameBase name
+        defaultResolver = [|parseValue|]
+        defaultMissing  = [|\_ -> Left $ MissingField nameStr|]
+        nestedResolver cons = handleRecord (nameStr ++ ".") cons
+
+        resolveValue = case typ of
+            ConT tnam -> do
+                info <- reify tnam
+                case info of
+                    TyConI (DataD _ _ _ c@[RecC _ _] _) -> [|\sv -> Left $ InvalidValue sv|]
+                    TyConI (DataD _ _ _ [_] _) -> defaultResolver
+                    TyConI (DataD _ _ _ cons _) -> do
+                        let lst = listE . map consItem $ cons
+                        [|\sv -> case lookup sv $lst of
+                            Nothing -> Left $ InvalidValue sv
+                            Just c  -> Right c |]
+                    _ -> defaultResolver
+
+            _ -> defaultResolver
+
+        resolveMissing = case typ of
+            AppT a b
+                | a == (ConT ''Maybe) -> [|\_ -> Right Nothing|]
+            ConT tnam -> do
+                info <- reify tnam
+                case info of
+                    TyConI (DataD _ _ _ c@[RecC _ _] _) -> nestedResolver c
+                    _ -> defaultMissing
+            _ -> defaultMissing
+
+
 
 class Config c where
     parseConfig :: String -> Either ConfigError c
