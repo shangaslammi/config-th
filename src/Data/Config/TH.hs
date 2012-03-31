@@ -43,16 +43,15 @@ mkConfig name = configInstance where
             _ -> error "mkConfig can only be called for data types"
 
     handleRecord :: String -> [Con] -> ExpQ
-    handleRecord prefix cons = case cons of
-        [RecC cname vars] -> do
-            let builders = map (buildField prefix) vars
-                star     = [|(<*>)|]
-                fldParam = varE (mkName "fields")
-                step (e,op) bldr = (infixApp e op (appE bldr fldParam), star)
-                (expr, _) = foldl' step (conE cname, [|(<$>)|]) builders
+    handleRecord prefix [RecC cname vars] = lam1E (varP parName) expr where
+        parName   = mkName "fields"
+        (expr, _) = foldl' step (conE cname, [|(<$>)|]) builders
+        builders  = map (buildField prefix) vars
+        fldParam  = varE parName
+        step (e,op) bldr = (infixApp e op (appE bldr fldParam), [|(<*>)|])
 
-            lam1E (varP (mkName "fields"))  expr
-        _ -> error "mkConfig can only be called for data types with one record constructor"
+    handleRecord _ _ = error $
+        "mkConfig can only be called for data types with one record constructor"
 
     consItem :: Con -> ExpQ
     consItem (NormalC name []) = [|(nameStr, $(conE name))|]
