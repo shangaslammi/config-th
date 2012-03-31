@@ -64,31 +64,31 @@ confTest3_1 = unlines $
 
 main = hspec $ describe "Config-TH" $
     [ it "can parse basic named fields" $ do
-        let (Right cfg) = parseConfig confTest1_1
+        let (Right cfg) = parseConfig dottedFormat confTest1_1
         (cfg @@ stringField) @?= "foobar"
         (cfg @@ intField)    @?= 10
         (cfg @@ floatField)  @?= 2.5
         (cfg @@ optionalInt) @?= Just 4
 
     , it "returns missing optional fields as Nothing" $ do
-        let (Right cfg) = parseConfig confTest1_2
+        let (Right cfg) = parseConfig dottedFormat confTest1_2
         (cfg @@ stringField) @?= "foobar"
         (cfg @@ intField)    @?= 10
         (cfg @@ floatField)  @?= 2.5
         (cfg @@ optionalInt) @?= Nothing
 
     , it "reports an error for missing mandatory fields" $ do
-        let (Left err) = parseConfig confTest1_3 :: Either ConfigError ConfTest1
+        let (Left err) = parseConfig dottedFormat confTest1_3 :: Either ConfigError ConfTest1
         err @?= MissingField "floatField"
 
     , it "can parse custom algebraic data types" $ do
-        let (Right cfg) = parseConfig confTest2_1
+        let (Right cfg) = parseConfig dottedFormat confTest2_1
         (cfg @@ customField1) @?= Foo
         (cfg @@ customField2) @?= Bar
         (cfg @@ customField3) @?= Asdf
 
     , it "parses dot-separated fields into nested record data" $ do
-        let (Right cfg) = parseConfig confTest3_1
+        let (Right cfg) = parseConfig dottedFormat confTest3_1
         (cfg @@ customField) @?= Foo
         (cfg @@ subFields @@ stringField) @?= "foobar"
         (cfg @@ subFields @@ intField)    @?= 10

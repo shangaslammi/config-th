@@ -5,10 +5,12 @@
 
 module Data.Config.TH
     ( mkConfig
-    , Config(..)
+    , Config
     , ConfigValue(..)
     , ConfigError(..)
     , (@@)
+    , dottedFormat
+    , parseConfig
     ) where
 
 import Language.Haskell.TH
@@ -30,9 +32,7 @@ mkConfig name = configInstance where
     configInstance :: DecsQ
     configInstance = [d|
         instance Config $(conT name) where
-            parseConfig s = case parseFields s of
-                Just fields -> $buildConfig fields
-                Nothing     -> Left SyntaxError
+            buildConfig = $buildConfig
         |]
 
     buildConfig :: ExpQ
@@ -95,18 +95,12 @@ mkConfig name = configInstance where
         missingError = [|Left $ MissingField nameStr|]
 
 class Config c where
-    parseConfig :: String -> Either ConfigError c
-    parseConfig = undefined
+    buildConfig :: Fields -> Either ConfigError c
 
 (@@) :: (Config c) => c -> (c -> v) -> v
 (@@) = flip ($)
 
 infixl 5 @@
-
-parseFields :: String -> Maybe [(String, String)]
-parseFields = sequence . map parseLine . map words . lines where
-    parseLine [key,"=",value] = Just (key, value)
-    parseLine _               = Nothing
 
 class ConfigValue v where
     parseValue :: String -> Either ConfigError v
@@ -128,3 +122,13 @@ parseReadable s = case reads s of
     [(v, "")] -> Right v
     _         -> Left (InvalidValue s)
 
+type ConfigFormat = String -> Either ConfigError Fields
+type Fields = [(String, String)]
+
+dottedFormat :: ConfigFormat
+dottedFormat = sequence . map parseLine . map words . lines where
+    parseLine [key,"=",value] = Right (key, value)
+    parseLine ln              = Left SyntaxError
+
+parseConfig :: Config c => ConfigFormat -> String -> Either ConfigError c
+parseConfig = (<=<) buildConfig
