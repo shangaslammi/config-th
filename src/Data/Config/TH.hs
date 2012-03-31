@@ -31,12 +31,12 @@ mkConfig name = configInstance where
     configInstance = [d|
         instance Config $(conT name) where
             parseConfig s = case parseFields s of
-                Just fields -> $constrCfg fields
+                Just fields -> $buildConfig fields
                 Nothing     -> Left SyntaxError
         |]
 
-    constrCfg :: ExpQ
-    constrCfg = do
+    buildConfig :: ExpQ
+    buildConfig = do
         info <- reify name
         case info of
             TyConI (DataD _ _ _ cons _) -> processCons "" cons
