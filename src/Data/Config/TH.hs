@@ -39,11 +39,11 @@ mkConfig name = configInstance where
     buildConfig = do
         info <- reify name
         case info of
-            TyConI (DataD _ _ _ cons _) -> processCons "" cons
+            TyConI (DataD _ _ _ cons _) -> handleRecord "" cons
             _ -> error "mkConfig can only be called for data types"
 
-    processCons :: String -> [Con] -> ExpQ
-    processCons prefix cons = case cons of
+    handleRecord :: String -> [Con] -> ExpQ
+    handleRecord prefix cons = case cons of
         [RecC cname vars] -> do
             let builders = map (buildField prefix) vars
                 star     = [|(<*>)|]
@@ -65,7 +65,7 @@ mkConfig name = configInstance where
         let nameStr = prefix ++ nameBase name
             defaultResolver = [|parseValue|]
             defaultMissing  = [|\_ -> Left $ MissingField nameStr|]
-            nestedResolver cons = processCons (nameStr ++ ".") cons
+            nestedResolver cons = handleRecord (nameStr ++ ".") cons
 
             resolveValue = case typ of
                 ConT tnam -> do
