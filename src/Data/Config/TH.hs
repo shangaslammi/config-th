@@ -61,41 +61,38 @@ mkConfig name = configInstance where
     buildRecField :: String -> VarStrictType -> ExpQ
     buildRecField prefix (name, _, typ) = impl where
 
-        impl = [|\fields -> case lookup nameStr fields of
-            Just sv -> $resolveValue sv
-            Nothing -> $resolveMissing fields|]
+        impl = case typ of
+            ConT tnam -> reify tnam >>= conField
+            AppT t _ | t == (ConT ''Maybe) -> optionalField
+            _ -> defaultHandler
+
+        conField (TyConI (DataD _ _ _ cons _)) = case cons of
+            [RecC _ _] -> nestedRecord cons
+            [_]        -> defaultHandler
+            _          -> multipleConType cons
+        conField _ = defaultHandler
+
+        defaultHandler = [|\fields -> case lookup nameStr fields of
+            Just sv -> parseValue sv
+            Nothing -> $missingError|]
+
+        optionalField = [|\fields -> case lookup nameStr fields of
+            Just sv -> parseValue sv
+            Nothing -> Right Nothing|]
+
+        nestedRecord cons = handleRecord (nameStr ++ ".") cons
+
+        multipleConType cons = [|\fields -> case lookup nameStr fields of
+            Just sv -> $(lookupConstructor cons) sv
+            Nothing -> $missingError|]
+
+        lookupConstructor cons = [|\sv -> case lookup sv $lst of
+            Nothing -> Left $ InvalidValue sv
+            Just c  -> Right c |] where
+                lst = listE . map consItem $ cons
 
         nameStr = prefix ++ nameBase name
-        defaultResolver = [|parseValue|]
-        defaultMissing  = [|\_ -> Left $ MissingField nameStr|]
-        nestedResolver cons = handleRecord (nameStr ++ ".") cons
-
-        resolveValue = case typ of
-            ConT tnam -> do
-                info <- reify tnam
-                case info of
-                    TyConI (DataD _ _ _ c@[RecC _ _] _) -> [|\sv -> Left $ InvalidValue sv|]
-                    TyConI (DataD _ _ _ [_] _) -> defaultResolver
-                    TyConI (DataD _ _ _ cons _) -> do
-                        let lst = listE . map consItem $ cons
-                        [|\sv -> case lookup sv $lst of
-                            Nothing -> Left $ InvalidValue sv
-                            Just c  -> Right c |]
-                    _ -> defaultResolver
-
-            _ -> defaultResolver
-
-        resolveMissing = case typ of
-            AppT a b
-                | a == (ConT ''Maybe) -> [|\_ -> Right Nothing|]
-            ConT tnam -> do
-                info <- reify tnam
-                case info of
-                    TyConI (DataD _ _ _ c@[RecC _ _] _) -> nestedResolver c
-                    _ -> defaultMissing
-            _ -> defaultMissing
-
-
+        missingError = [|Left $ MissingField nameStr|]
 
 class Config c where
     parseConfig :: String -> Either ConfigError c
