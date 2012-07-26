@@ -5,7 +5,7 @@
 
 module Data.Config.TH
     ( mkConfig
-    , Config
+    , Config(..)
     , ConfigValue(..)
     , ConfigError(..)
     , (@@)

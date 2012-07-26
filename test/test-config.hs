@@ -62,7 +62,7 @@ confTest3_1 = unlines $
     , "subFields.optionalInt = 4"
     ]
 
-main = hspec $ describe "Config-TH" $
+main = hspec $ [ describe "Config-TH" $
     [ it "can parse basic named fields" $ do
         let (Right cfg) = parseConfig dottedFormat confTest1_1
         (cfg @@ stringField) @?= "foobar"
@@ -95,3 +95,4 @@ main = hspec $ describe "Config-TH" $
         (cfg @@ subFields @@ floatField)  @?= 2.5
         (cfg @@ subFields @@ optionalInt) @?= Just 4
     ]
+  ]
